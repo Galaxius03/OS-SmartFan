@@ -1,0 +1,241 @@
+/* ── CSS custom properties (same palette as previous networking project) ── */
+:root {
+  --bg:     #f3f6fa;
+  --panel:  #ffffff;
+  --ink:    #19324a;
+  --muted:  #5b6f80;
+  --ok:     #2a9d8f;   /* teal   — safe / cool   */
+  --warn:   #f4a261;   /* orange — warm           */
+  --danger: #e76f51;   /* red    — hot / error    */
+  --line:   #d8e2ec;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(140deg, #eaf3ff 0%, #f8fcff 45%, #eefaf5 100%);
+  min-height: 100vh;
+}
+
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.4rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: #ffffffd9;
+  backdrop-filter: blur(3px);
+}
+
+.topbar-main { min-width: 0; }
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.topbar p {
+  margin: 0.3rem 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#last-updated {
+  display: inline-block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.topbar-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  max-width: 48%;
+}
+
+/* Status chip pills — same pattern as previous project */
+.sensor-chip {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.24rem 0.68rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  background: #ffffff;
+}
+
+/* ── Card grid ──────────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.2rem;
+  padding: 1.2rem;
+}
+
+/* Wide card spans both columns on larger screens */
+.wide {
+  grid-column: 1 / -1;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.4rem;
+  box-shadow: 0 10px 22px rgba(33, 64, 92, 0.08);
+  min-width: 0;
+}
+
+.card h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1.05rem;
+}
+
+.card > p {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.35;
+  margin: 0 0 0.8rem;
+}
+
+.value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 0.4rem;
+}
+
+.sub {
+  margin-top: 0.4rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+/* ── Status colour helpers (same class names as previous project) ───────── */
+.status-ok     { color: var(--ok);     }
+.status-warn   { color: var(--warn);   }
+.status-danger { color: var(--danger); }
+
+/* ── Temperature gauge ──────────────────────────────────────────────────── */
+.gauge-wrap {
+  max-width: 220px;
+  margin: 0 auto 0.5rem;
+}
+
+#temp-gauge {
+  width: 100%;
+  overflow: visible;
+}
+
+/* ── Humidity progress bar (same as water bar in previous project) ──────── */
+.bar-wrap {
+  margin-top: 0.8rem;
+  width: 100%;
+  height: 10px;
+  background: #e8eef5;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background: var(--ok);
+  border-radius: 99px;
+  transition: width 0.4s ease, background-color 0.4s ease;
+}
+
+/* ── LED indicator dot ──────────────────────────────────────────────────── */
+.led-dot-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0.6rem 0 0.8rem;
+}
+
+.led-dot {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #d8e2ec;            /* default: unknown / off-grey     */
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.led-dot.on {
+  background: var(--ok);
+  box-shadow: 0 0 18px rgba(42, 157, 143, 0.55);
+}
+
+.led-dot.off {
+  background: #c0cdd8;
+  box-shadow: none;
+}
+
+/* ── Control buttons ────────────────────────────────────────────────────── */
+.btn-group {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.btn {
+  flex: 1 1 auto;
+  min-width: 80px;
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-on   { background: var(--ok);     color: #fff; }
+.btn-off  { background: var(--danger); color: #fff; }
+.btn-auto { background: var(--warn);   color: #fff; }
+
+.btn:hover { opacity: 0.88; }
+
+/* ── Temperature history chart ──────────────────────────────────────────── */
+.chart-wrap {
+  position: relative;
+  margin-top: 0.6rem;
+}
+
+#temp-chart {
+  width: 100%;
+  height: 160px;
+  display: block;
+  background: #f8fafb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+/* ── Responsive tweaks ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1.1rem 0.8rem;
+  }
+
+  .topbar h1      { font-size: 1.2rem; }
+
+  .topbar-indicators {
+    justify-content: flex-start;
+    max-width: 100%;
+  }
+
+  .sensor-chip { font-size: 0.72rem; padding: 0.2rem 0.55rem; }
+
+  .btn-group { flex-direction: column; }
+  .btn       { width: 100%; }
+}
