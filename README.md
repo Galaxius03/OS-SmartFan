@@ -147,6 +147,6 @@ dmesg | tail -10
 |---|---|---|
 | Darrius John Chan Tiang Ser | 2500360 | Kernel module (led_driver.c, Makefile) |
 | Hoon Chi Peng Shaun  | 2500629 | User-space C + LED hardware (led_control.c) |
-| Liris Goh | [ID] | Sense HAT + Python server (led.py, led_server.py) |
-| Vanessa Yee | [ID] | Bash script + integration (led_controller.sh) |
-| Zechary  | [ID] | Report, slides, documentation |
+| Liris Goh | 2500011 | Sense HAT + Python server (led.py, led_server.py) |
+| Vanessa Yee | 2502591 | Bash script + integration (led_controller.sh) |
+| Zechary Wong | 2500819 | Report, slides, documentation |
