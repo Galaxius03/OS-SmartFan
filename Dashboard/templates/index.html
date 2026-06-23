@@ -15,8 +15,6 @@
         <p>CSC1107 Project 10 — GPIO Smart Fan Controller (LED Variant)</p>
         <span id="last-updated">Last updated: --</span>
       </div>
-
-      <!-- Connection status chips — mirror the previous project's indicator pattern -->
       <div class="topbar-indicators">
         <span class="sensor-chip" id="indicator-sensor">Sense HAT: --</span>
         <span class="sensor-chip" id="indicator-led">LED Driver: --</span>
@@ -29,14 +27,9 @@
       <!-- Card 1: Temperature gauge -->
       <section class="card" id="temp-card">
         <h2>Temperature</h2>
-        <p>Ambient reading from Sense HAT with CPU-heat correction applied.</p>
+        <p>Ambient reading from Sense HAT with CPU-heat correction applied.
+           LED turns ON above 29 °C threshold.</p>
 
-        <!-- SVG semicircle gauge ────────────────────────────────────────
-             viewBox: 0 0 200 115
-             Arc centre: (100, 100), radius 80
-             Background arc: M 20 100 → (180, 100) clockwise through (100, 20)
-             Value arc: same start, endpoint calculated from temperature %
-        ──────────────────────────────────────────────────────────────── -->
         <div class="gauge-wrap">
           <svg id="temp-gauge" viewBox="0 0 200 110" aria-label="Temperature gauge">
             <!-- Background track (grey) -->
@@ -61,8 +54,8 @@
                   text-anchor="middle"
                   font-size="11" fill="#5b6f80">°C</text>
 
-            <!-- Scale labels: cold / hot -->
-            <text x="16" y="114" font-size="9" fill="#5b6f80" text-anchor="middle">20°</text>
+            <!-- Scale labels -->
+            <text x="16"  y="114" font-size="9" fill="#5b6f80" text-anchor="middle">20°</text>
             <text x="184" y="114" font-size="9" fill="#5b6f80" text-anchor="middle">50°</text>
           </svg>
         </div>
@@ -71,23 +64,10 @@
         <div class="sub"  id="temp-status">Waiting for sensor…</div>
       </section>
 
-      <!-- Card 2: Humidity -->
-      <section class="card" id="humidity-card">
-        <h2>Humidity</h2>
-        <p>Relative humidity from Sense HAT. Auto-mode triggers LED above 95% RH.</p>
-        <div class="value" id="humidity-value">-- %</div>
-        <div class="sub"   id="humidity-status">Waiting for sensor…</div>
-        <!-- Progress bar -->
-        <div class="bar-wrap">
-          <div class="bar" id="humidity-bar" style="width:0%"></div>
-        </div>
-      </section>
-
-      <!-- Card 3: LED status -->
+      <!-- Card 2: LED status -->
       <section class="card" id="led-card">
         <h2>LED Status</h2>
         <p>Current state of the physical GPIO 24 indicator LED.</p>
-        <!-- Large coloured dot indicator -->
         <div class="led-dot-wrap">
           <div class="led-dot" id="led-dot"></div>
         </div>
@@ -95,12 +75,11 @@
         <div class="sub"   id="led-mode">Auto-mode: --</div>
       </section>
 
-      <!-- Card 4: Manual controls -->
+      <!-- Card 3: Manual controls -->
       <section class="card" id="controls-card">
         <h2>Controls</h2>
         <p>Manually override the LED or hand control back to the temperature sensor.</p>
         <div class="btn-group">
-          <!-- Each button calls the corresponding /api/led/* endpoint -->
           <button class="btn btn-on"   onclick="sendCommand('/api/led/on')">Turn ON</button>
           <button class="btn btn-off"  onclick="sendCommand('/api/led/off')">Turn OFF</button>
           <button class="btn btn-auto" onclick="sendCommand('/api/led/auto', { active: true })">
@@ -110,30 +89,25 @@
         <div class="sub" id="controls-feedback" style="margin-top:0.8rem">--</div>
       </section>
 
-      <!-- Card 5: Temperature history (full-width) -->
+      <!-- Card 4: Temperature history (full-width) -->
       <section class="card wide" id="history-card">
         <h2>Temperature History</h2>
         <p>Last 20 readings, updated every 3 seconds. Threshold line at 29 °C.</p>
-        <!-- SVG line chart — drawn entirely by JS, no external library needed -->
         <div class="chart-wrap">
           <svg id="temp-chart" viewBox="0 0 600 160" preserveAspectRatio="none"
                aria-label="Temperature history chart">
-            <!-- Threshold line at 29 °C (re-positioned by JS based on scale) -->
             <line id="threshold-line"
                   x1="0" y1="0" x2="600" y2="0"
                   stroke="#f4a261" stroke-width="1"
                   stroke-dasharray="6 4" opacity="0.8" />
-            <!-- Temperature history polyline — drawn by JS -->
             <polyline id="history-line"
                       points=""
                       fill="none" stroke="#2a9d8f" stroke-width="2.5"
                       stroke-linejoin="round" stroke-linecap="round" />
-            <!-- Area fill under the line -->
             <polygon  id="history-fill"
                       points=""
                       fill="#2a9d8f" opacity="0.08" />
           </svg>
-          <!-- Y-axis labels — inserted by JS -->
           <div class="chart-labels" id="chart-labels"></div>
         </div>
         <div class="sub" style="margin-top:0.5rem">
@@ -143,7 +117,7 @@
         </div>
       </section>
 
-    </main><!-- /grid -->
+    </main>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
