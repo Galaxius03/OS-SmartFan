@@ -46,11 +46,13 @@ class LedApiServer:
         self.app = Flask(__name__)
         self.led_controller = LedController()
 
-        # Start Sense HAT environment monitoring immediately.
-        # Without a Sense HAT, this prints a warning and auto-mode is disabled,
-        # but the API still works fully for manual control.
-        self.led_controller.start_auto()
+        # Sync state on startup — reset LED to off
+        try:
+            self.led_controller.turn_off()
+        except Exception:
+            pass    # /dev/gpioled may not exist yet, that's fine
 
+        self.led_controller.start_auto()
         self._register_routes()
 
     def _register_routes(self) -> None:
