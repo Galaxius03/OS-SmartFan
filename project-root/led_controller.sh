@@ -79,7 +79,7 @@ echo "════════════════════════�
 echo ""
 echo "  Device node  : /dev/gpioled"
 echo "  GPIO pin     : BCM 24 (physical pin 18)"
-echo "  Temp source  : /tmp/sense_temp"
+echo "  Temp source  : /tmp/sense_temp (written by PiServers/led_server.py)"
 echo "  Threshold    : 29.0 degrees C"
 echo ""
 

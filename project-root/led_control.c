@@ -146,7 +146,7 @@ int main(void)
         temp = read_sense_temp();
 
         if (temp < 0.0f) {
-            printf("[waiting] %s not ready — is led.py running?\n",
+            printf("[waiting] %s not ready — is PiServers/led_server.py running?\n",
                    SENSE_TEMP_PATH);
             sleep(POLL_INTERVAL_S);
             continue;
