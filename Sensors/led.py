@@ -48,7 +48,7 @@ except ImportError:
 DEVICE_PATH: str     = "/dev/gpioled"     # Kernel character device
 SENSE_TEMP_PATH: str = "/tmp/sense_temp"  # Shared file read by led_control.c
 
-TEMP_THRESHOLD: float = 29.0   # degrees C — LED turns ON above this value
+TEMP_THRESHOLD: float = 29.0   # degrees C; LED turns ON at or above this value
 
 # ---------------------------------------------------------------------------
 # Module-level state — all mutations guarded by _lock
@@ -56,7 +56,7 @@ TEMP_THRESHOLD: float = 29.0   # degrees C — LED turns ON above this value
 _lock: threading.RLock = threading.RLock()
 _led_state: dict        = {"is_on": False}
 _auto_mode_active: bool = False
-_env_data: dict         = {"temperature": 0.0}   # humidity removed
+_env_data: dict         = {"temperature": None}   # humidity removed
 _monitor_thread: threading.Thread | None = None
 
 
@@ -141,9 +141,6 @@ def _env_monitor_loop() -> None:
             raw_temp  = sense.get_temperature()
             corrected = _corrected_temp(raw_temp)
 
-            # Update shared env data — temperature only
-            _env_data["temperature"] = corrected
-
             # Write corrected temperature to shared file for led_control.c
             try:
                 with open(SENSE_TEMP_PATH, "w") as f:
@@ -152,9 +149,12 @@ def _env_monitor_loop() -> None:
                 pass
 
             with _lock:
+                # Update shared env data; None means no sensor reading yet.
+                _env_data["temperature"] = corrected
+
                 if _auto_mode_active:
                     # LED on/off based on temperature threshold only
-                    should_be_on: bool = corrected > TEMP_THRESHOLD
+                    should_be_on: bool = corrected >= TEMP_THRESHOLD
 
                     # Read ground truth from kernel — not in-memory shadow
                     currently_on: bool = _read_kernel_state()
@@ -255,7 +255,8 @@ def get_env_data() -> dict:
     """
     Return the most recent corrected Sense HAT temperature reading.
 
-    Returns {'temperature': float}
-    Value is 0.0 until the first sensor read completes.
+    Returns {'temperature': float | None}
+    Value is None until the first sensor read completes.
     """
-    return _env_data.copy()
+    with _lock:
+        return _env_data.copy()
