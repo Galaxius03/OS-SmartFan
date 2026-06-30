@@ -52,6 +52,9 @@
 /* Shared file written by led.py with the corrected Sense HAT temperature */
 #define SENSE_TEMP_PATH "/tmp/sense_temp"
 
+/* Mode file written by led.py: "1" = auto, "0" = manual override */
+#define MODE_PATH       "/tmp/led_auto_mode"
+
 /* Temperature threshold in °C — must match TEMP_THRESHOLD in led.py */
 #define TEMP_THRESHOLD  29.0f
 
@@ -141,6 +144,23 @@ int main(void)
 
     /* ── Main polling loop ────────────────────────────────────────────────── */
     while (running) {
+
+        /* Step 0: Check mode file — skip cycle if manual override is active.
+         * led.py writes "0" to /tmp/led_auto_mode when the dashboard's Turn ON
+         * or Turn OFF button is pressed, and "1" when Auto Mode is re-enabled.
+         * Absence of the file is treated as auto (safe default on first boot). */
+        {
+            FILE *mfp = fopen(MODE_PATH, "r");
+            if (mfp) {
+                int mode = 1;
+                fscanf(mfp, "%d", &mode);
+                fclose(mfp);
+                if (mode == 0) {
+                    sleep(POLL_INTERVAL_S);
+                    continue;
+                }
+            }
+        }
 
         /* Step 1: Get corrected Sense HAT ambient temperature */
         temp = read_sense_temp();

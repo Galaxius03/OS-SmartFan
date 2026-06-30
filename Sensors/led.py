@@ -214,6 +214,15 @@ def get_led_state(led_pin: int = 24) -> dict:
         return {"is_on": is_on, "auto_mode": _auto_mode_active}
 
 
+def _write_mode_file(active: bool) -> None:
+    """Write auto-mode state to /tmp/led_auto_mode so led_control.c can read it."""
+    try:
+        with open("/tmp/led_auto_mode", "w") as f:
+            f.write("1" if active else "0")
+    except OSError:
+        pass
+
+
 def start_env_monitoring(auto_mode: bool = True) -> None:
     """
     Start the Sense HAT temperature monitor thread (if not already running).
@@ -228,6 +237,7 @@ def start_env_monitoring(auto_mode: bool = True) -> None:
 
     with _lock:
         _auto_mode_active = auto_mode
+        _write_mode_file(auto_mode)
         if _monitor_thread is None or not _monitor_thread.is_alive():
             _monitor_thread = threading.Thread(
                 target=_env_monitor_loop,
@@ -249,6 +259,7 @@ def set_auto_mode(active: bool) -> None:
     global _auto_mode_active
     with _lock:
         _auto_mode_active = active
+        _write_mode_file(active)
 
 
 def get_env_data() -> dict:
