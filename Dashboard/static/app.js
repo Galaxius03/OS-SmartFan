@@ -22,20 +22,20 @@
 
 /* ── Constants ────────────────────────────────────────────────────────────── */
 
-/** How often to poll the API, in milliseconds. */
+// Polling rate of API
 const POLL_INTERVAL_MS = 3000;
 
-/** Temperature range for the gauge arc (°C). */
+//Temperature gauge range for led.py
 const GAUGE_MIN = 20;
 const GAUGE_MAX = 50;
 
-/** Threshold that triggers the LED (must match TEMP_THRESHOLD in led.py). */
+// Temperature threshold for LED control in Celsius to light up
 const TEMP_THRESHOLD = 29;
 
-/** Maximum number of data points kept in the history chart. */
+// Max no. of data points stored in the history chart, older points are dropped
 const HISTORY_MAX = 20;
 
-/* ── Element references ───────────────────────────────────────────────────── */
+// Element references 
 const el = {
   lastUpdated:     document.getElementById("last-updated"),
   indicatorSensor: document.getElementById("indicator-sensor"),
@@ -61,33 +61,26 @@ const el = {
   thresholdLine:   document.getElementById("threshold-line"),
 };
 
-/* ── State ────────────────────────────────────────────────────────────────── */
-
-/** Rolling array of the last HISTORY_MAX temperature readings. */
+// Array to store past temperature readings for history chart
 const tempHistory = [];
 
-/* ── Helpers ──────────────────────────────────────────────────────────────── */
+// Helper functions
 
-/**
- * setStatusClass — remove all status classes then apply the given one.
- */
+// removes all existing status classes and adds new one if provided
 function setStatusClass(element, level) {
   if (!element) return;
   element.classList.remove("status-ok", "status-warn", "status-danger");
   if (level) element.classList.add(level);
 }
 
-/**
- * setIndicator — update a topbar chip label and colour.
- */
+// updates topbar connection indicator
 function setIndicator(element, label, isConnected) {
   if (!element) return;
   element.textContent = `${label}: ${isConnected ? "Connected" : "Disconnected"}`;
   setStatusClass(element, isConnected ? "status-ok" : "status-danger");
 }
 
-/* ── Temperature gauge (SVG arc) ─────────────────────────────────────────── */
-
+// Temperature gauge arc geometry display on dashboard
 /**
  * updateGaugeArc — draws the coloured semicircle arc proportional to temperature.
  *
@@ -130,7 +123,6 @@ function updateGaugeArc(temp) {
   el.gaugeLabel.setAttribute("fill", color);
 }
 
-/* ── Card update functions ────────────────────────────────────────────────── */
 
 /**
  * updateTemperature — refresh the temperature card.
