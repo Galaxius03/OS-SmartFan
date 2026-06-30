@@ -1,37 +1,3 @@
-"""
-led.py — Core LED control module for CSC1107 Project 10 (LED variant).
-
-Architecture
-------------
-Two responsibilities:
-
-  1. READ ambient temperature from the Sense HAT sensor, apply a CPU-heat
-     correction, and write the result to /tmp/sense_temp so that
-     led_control.c uses the same reading as this Python layer.
-
-  2. CONTROL the physical LED by writing "ON" or "OFF" to /dev/gpioled —
-     the character device created by led_driver.ko. The kernel module
-     owns GPIO 24 via direct BCM2711 register access.
-
-Temperature only
-----------------
-Humidity is intentionally excluded. The Sense HAT humidity sensor is
-located close to the Pi CPU and produces unreliable readings (often
-above 100% RH) due to CPU heat interference. LED control is based
-solely on the corrected ambient temperature reading.
-
-State sync
-----------
-LED state is always read directly from /dev/gpioled (kernel module)
-rather than an in-memory shadow. This prevents stale state bugs where
-the dashboard shows ON even though the physical LED is OFF.
-
-Sense HAT temperature correction
----------------------------------
-    cpu_temp  = /sys/class/thermal/thermal_zone0/temp / 1000  (degrees C)
-    corrected = raw_temp - (cpu_temp - raw_temp) / 5.4
-"""
-
 from __future__ import annotations
 
 import threading
@@ -42,17 +8,13 @@ try:
 except ImportError:
     SenseHat = None
 
-# ---------------------------------------------------------------------------
 # Paths and thresholds
-# ---------------------------------------------------------------------------
 DEVICE_PATH: str     = "/dev/gpioled"     # Kernel character device
 SENSE_TEMP_PATH: str = "/tmp/sense_temp"  # Shared file read by led_control.c
 
 TEMP_THRESHOLD: float = 29.0   # degrees C — LED turns ON above this value
 
-# ---------------------------------------------------------------------------
 # Module-level state — all mutations guarded by _lock
-# ---------------------------------------------------------------------------
 _lock: threading.RLock = threading.RLock()
 _led_state: dict        = {"is_on": False}
 _auto_mode_active: bool = False
@@ -60,10 +22,7 @@ _env_data: dict         = {"temperature": 0.0}   # humidity removed
 _monitor_thread: threading.Thread | None = None
 
 
-# ---------------------------------------------------------------------------
 # Internal helpers
-# ---------------------------------------------------------------------------
-
 def _get_cpu_temp() -> float:
     """Read CPU die temperature from the Linux thermal interface (degrees C)."""
     try:
@@ -171,10 +130,8 @@ def _env_monitor_loop() -> None:
         time.sleep(2.0)
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
+# Public API
 def turn_led_on(led_pin: int = 24) -> str:
     """
     Turn the LED on by writing "ON" to /dev/gpioled.
