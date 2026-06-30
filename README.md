@@ -78,6 +78,8 @@ pip3 install flask requests
 sudo ./led_controller.sh
 ```
 
+
+
 ### Option B — Manual
 
 **Terminal 1 (Pi) — load kernel module:**
@@ -138,6 +140,18 @@ curl -X POST http://localhost:5000/api/led/auto \
 sudo rmmod led_driver
 dmesg | tail -10
 ```
+
+---
+
+## Troubleshooting
+
+| Error | Cause | Fix |
+|---|---|---|
+| `Unable to locate package raspberrypi-kernel-headers` | Package renamed on Bookworm | `sudo apt install linux-headers-$(uname -r)` |
+| `[Errno 13] Permission denied: '/dev/gpioled'` | Device node owned by root | `sudo chmod 666 /dev/gpioled` (or set up the udev rule below for a permanent fix) |
+| `externally-managed-environment` (pip) | Bookworm restricts system-wide pip installs | `pip3 install flask --break-system-packages` |
+| `$'\r': command not found` / `set: -set: invalid option` | Bash script has Windows line endings (CRLF) | `sed -i 's/\r$//' led_controller.sh` — never edit/save the script on Windows before transferring |
+| `/tmp/sense_temp` never appears | `led_server.py` not running, or kernel module not loaded first | Run `sudo insmod led_driver.ko` then `python3 PiServers/led_server.py` — check terminal for `sense_hat` import errors |
 
 ---
 
