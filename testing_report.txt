@@ -1,0 +1,444 @@
+Testing, Verification & dmesg Output Analysis
+=============================================
+
+
+3.1 Kernel Module Lifecycle
+---------------------------
+Purpose: Verify the module compiles, loads, creates the device node, and unloads cleanly.
+
+3.1.1 Compilation
+
+Run and capture terminal output:
+
+    make clean && make
+
+Include: Screenshot of full make output showing CC [M] and LD [M] lines with zero warnings.
+Confirm led_driver.ko is produced.
+
+3.1.2 Module Loading
+
+    sudo insmod led_driver.ko
+    echo "Exit code: $?"
+    lsmod | grep led_driver
+    ls -la /dev/gpioled
+    sudo chmod 666 /dev/gpioled
+    ls -la /dev/gpioled
+
+Include: Screenshot showing lsmod output with led_driver listed, and ls -la showing
+/dev/gpioled before and after chmod 666.
+
+3.1.3 Module Unloading
+
+    sudo rmmod led_driver
+    echo "Exit code: $?"
+    ls /dev/gpioled 2>&1
+    lsmod | grep led_driver || echo "Module not listed — successfully removed"
+
+Include: Screenshot confirming /dev/gpioled no longer exists after rmmod.
+
+3.1.4 Error Cases
+
+    # Double-insert (while already loaded)
+    sudo insmod led_driver.ko
+
+    # Remove when not loaded
+    sudo rmmod led_driver
+    sudo rmmod led_driver
+
+Include: Screenshot of both error messages.
+Expected: "insmod: ERROR: could not insert module led_driver.ko: File exists"
+          "rmmod: ERROR: Module led_driver is not currently loaded"
+
+
+3.2 dmesg Output Analysis — Module Init & Cleanup
+--------------------------------------------------
+Purpose: Annotate every printk message produced by led_driver_init() and led_driver_exit().
+
+Commands:
+
+    sudo dmesg -C
+    sudo insmod led_driver.ko
+    dmesg
+
+Include: Screenshot of raw dmesg output, then annotate each line using the table below.
+
+Init messages:
+
+  Raw dmesg line                                                          | Kernel function          | Explanation
+  gpioled: -- loading module --                                           | led_driver_init() entry  | Module init function entered on insmod
+  gpioled: GPIO method: direct BCM2711 register access (ioremap @ 0xFE200000) | led_driver_init()    | Documents direct register access strategy — no gpio_request() API (unavailable on custom kernel 6.18)
+  gpioled: Step 1 OK — major number <N> allocated                        | alloc_chrdev_region()    | Kernel assigned a dynamic major device number for /dev/gpioled
+  gpioled: Step 2 OK — character device registered                       | cdev_add()               | struct cdev linked to fops; kernel routes open/read/write/close to this driver
+  gpioled: Step 3 OK — class 'gpio_led' created                          | class_create()           | /sys/class/gpio_led/ directory created in sysfs
+  gpioled: Step 4 OK — /dev/gpioled created                              | device_create()          | udev populated /dev/gpioled device node
+  gpioled: Step 5 OK — GPIO 24 mapped at virtual addr 0x<addr>, configured as output (LOW) | ioremap() + writel() | BCM2711 GPIO registers at 0xFE200000 mapped to kernel virtual address; GPFSEL2 bits 12-14 set to 001 (output); GPCLR0 bit 24 written to drive pin LOW
+  gpioled: -- module ready. /dev/gpioled open for commands (GPIO mode — LED active). -- | End of led_driver_init() | Module fully initialised; device node ready
+
+Simulation mode (if ioremap fails):
+
+  Raw dmesg line                                                          | Explanation
+  gpioled: Step 5 WARN — ioremap(0xFE200000) failed — running in simulation mode | Memory protection blocked register mapping; /dev/gpioled still works but no physical GPIO driven
+  gpioled: -- module ready. /dev/gpioled open for commands (simulation mode — no physical LED). -- | Module loaded in degraded mode
+
+Unload — capture after sudo rmmod led_driver:
+
+    dmesg | tail -10
+
+  Raw dmesg line                                    | Explanation
+  gpioled: -- unloading module --                   | led_driver_exit() entered on rmmod
+  gpioled: GPIO 24 driven LOW                       | writel(1U << 24, GPCLR0) — pin driven low before release
+  gpioled: GPIO registers unmapped                  | iounmap(gpio_regs) — kernel virtual-to-physical mapping released
+  gpioled: /dev/gpioled removed                     | device_destroy() — device node deleted from /dev/
+  gpioled: class 'gpio_led' destroyed               | class_destroy() — sysfs class removed
+  gpioled: -- module unloaded cleanly --            | All resources freed; no memory leaks
+
+Include: Screenshot of dmesg | tail -10 after rmmod.
+
+
+3.3 dmesg Output Analysis — Device File Operations
+---------------------------------------------------
+Purpose: Show that every file operation on /dev/gpioled produces the correct printk message,
+confirming kernel-side handlers are called.
+
+Run each command individually and capture dmesg | tail -5 after each.
+
+3.3.1 Write "ON"
+
+    echo "ON" | sudo tee /dev/gpioled
+    dmesg | tail -5
+
+Expected dmesg output:
+    gpioled: device opened by user-space process
+    gpioled: command 'ON'  received — GPIO 24 HIGH
+    gpioled: device closed by user-space process
+
+Include: Screenshot. Annotate: tee triggers open() -> dev_open(), write() -> dev_write()
+(which calls gpio24_set(1), writing 1 << 24 to GPSET0), then close() -> dev_release().
+Physical LED should be on.
+
+3.3.2 Read State
+
+    cat /dev/gpioled
+    dmesg | tail -5
+
+Expected terminal output: LED:ON
+Expected dmesg output:
+    gpioled: device opened by user-space process
+    gpioled: state sent to user space -> LED:ON
+    gpioled: device closed by user-space process
+
+Include: Screenshot. Annotate: cat invokes read() -> dev_read(), which calls copy_to_user()
+to transfer "LED:ON\n" across the kernel/user boundary.
+
+3.3.3 Write "OFF"
+
+    echo "OFF" | sudo tee /dev/gpioled
+    dmesg | tail -5
+
+Expected dmesg output:
+    gpioled: device opened by user-space process
+    gpioled: command 'OFF' received — GPIO 24 LOW
+    gpioled: device closed by user-space process
+
+Include: Screenshot. Physical LED should be off.
+
+3.3.4 Read State After OFF
+
+    cat /dev/gpioled
+
+Expected terminal output: LED:OFF
+Include: Screenshot.
+
+3.3.5 Invalid Input
+
+    echo "BLAH" | sudo tee /dev/gpioled
+    dmesg | tail -3
+
+Expected dmesg output:
+    gpioled: unknown command 'BLAH' (expected 'ON' or 'OFF')
+
+Include: Screenshot. Note severity: KERN_WARNING. dev_write() returns -EINVAL;
+tee reports a write error.
+
+
+3.4 Character Device — System Call Round-Trip Verification
+----------------------------------------------------------
+Purpose: Prove write() -> kernel -> hardware -> read() -> user-space data path is correct.
+
+    # Write ON, read back state — must match
+    echo "ON"  | sudo tee /dev/gpioled && cat /dev/gpioled
+
+    # Write OFF, read back state — must match
+    echo "OFF" | sudo tee /dev/gpioled && cat /dev/gpioled
+
+Include: Screenshot showing both pairs. Both reads must return the state consistent with
+the prior write. Annotate: copy_from_user() in dev_write() and copy_to_user() in dev_read()
+are the kernel functions responsible for data transfer across the privilege boundary.
+
+
+3.5 BCM2711 GPIO Register Verification
+---------------------------------------
+Purpose: Document the hardware register layer that the kernel module controls directly.
+
+Include a table:
+
+  Register          | Physical address | Offset from base | Role in this driver
+  BCM2711_GPIO_BASE | 0xFE200000       | —                | Physical base of GPIO peripheral
+  GPFSEL2           | 0xFE200008       | +0x08            | Bits 12-14 set to 001 — configure GPIO 24 as output
+  GPSET0            | 0xFE20001C       | +0x1C            | Write 1 << 24 to drive GPIO 24 HIGH (LED on)
+  GPCLR0            | 0xFE200028       | +0x28            | Write 1 << 24 to drive GPIO 24 LOW (LED off)
+
+Include: Annotated extract of gpio24_set() from led_driver.c lines 123-132 showing the
+writel() calls. Include a photo or multimeter reading showing GPIO 24 at ~3.3V when ON
+and ~0V when OFF (or note simulation mode if ioremap failed).
+
+
+3.6 User-Space Controller (led_control.c)
+-----------------------------------------
+Purpose: Verify the C program correctly reads temperature, applies the threshold,
+and uses write()/read() system calls.
+
+Prerequisites:
+
+    # Terminal 1 — start sensor layer
+    python3 PiServers/led_server.py
+
+    # Verify shared temp file is being written
+    cat /tmp/sense_temp
+
+Run controller:
+
+    sudo ./led_control
+
+Expected startup output:
+    +======================================+
+    |  LED Control — CSC1107 Project 10    |
+    +======================================+
+
+    Device    : /dev/gpioled
+    Temp src  : /tmp/sense_temp
+    Threshold : 29.0 degC
+    Poll rate : 5 s
+
+    Opened /dev/gpioled successfully.
+
+    Temp (degC)  Cmd   Kernel response
+    -----------------------------------------
+
+Include: Screenshot of the header and at least two polling rows — one showing OFF
+(temp < 29°C) and one showing ON (temp > 29°C).
+
+Threshold simulation test:
+
+    # In a separate terminal — force temp above threshold
+    echo "30.50" | sudo tee /tmp/sense_temp
+
+    # Force temp below threshold
+    echo "25.00" | sudo tee /tmp/sense_temp
+
+Include: Screenshot showing the controller responding within 5 seconds each time.
+
+Ctrl-C clean shutdown — press Ctrl-C and capture:
+
+    -----------------------------------------
+    Shutting down — sending OFF command...
+    Device closed. Check dmesg for final kernel log.
+
+Then:
+
+    dmesg | tail -5
+
+Include: Screenshot showing dev_release() message and final OFF command logged in dmesg.
+
+
+3.7 Sensor Layer (led.py)
+--------------------------
+Purpose: Verify temperature correction, file IPC, and auto-mode control.
+
+3.7.1 Temperature Correction Formula
+
+Document the formula used at led.py line 86:
+
+    corrected = raw - (cpu - raw) / 5.4
+
+Include: A worked numerical example from a live reading, e.g.:
+    Raw Sense HAT: 38.2°C, CPU: 52.7°C
+    corrected = 38.2 - (52.7 - 38.2) / 5.4 = 38.2 - 2.69 = 35.51°C
+
+Capture live values:
+
+    cat /tmp/sense_temp
+    cat /sys/class/thermal/thermal_zone0/temp    # divide by 1000 for degC
+
+Include: Screenshot of both files and the calculated corrected value matching
+what the dashboard shows.
+
+3.7.2 Auto-Mode Verification
+
+    curl -X POST http://localhost:5000/api/led/auto \
+         -H "Content-Type: application/json" \
+         -d '{"active": true}'
+
+    # Check auto-mode is active
+    curl http://localhost:5000/api/status
+
+Include: Screenshot of JSON response showing "auto_mode": true. Then show the LED
+state changing automatically as /tmp/sense_temp crosses 29°C.
+
+
+3.8 REST API Verification (led_server.py)
+------------------------------------------
+Purpose: Confirm all four endpoints return correct JSON and trigger correct hardware
+state changes. Run on Pi; capture full JSON response for each command.
+
+3.8.1 GET /api/status
+
+    curl -s http://<PI_IP>:5000/api/status | python3 -m json.tool
+
+Expected response:
+    {
+        "led": {
+            "is_on": false,
+            "auto_mode": true
+        },
+        "environment": {
+            "temperature": 27.34
+        }
+    }
+
+3.8.2 POST /api/led/on
+
+    curl -s -X POST http://<PI_IP>:5000/api/led/on | python3 -m json.tool
+
+Expected: "ok": true, "is_on": true, "auto_mode": false. Physical LED on.
+
+3.8.3 POST /api/led/off
+
+    curl -s -X POST http://<PI_IP>:5000/api/led/off | python3 -m json.tool
+
+Expected: "ok": true, "is_on": false, "auto_mode": false.
+
+3.8.4 POST /api/led/auto — enable
+
+    curl -s -X POST http://<PI_IP>:5000/api/led/auto \
+         -H "Content-Type: application/json" \
+         -d '{"active": true}' | python3 -m json.tool
+
+Expected: "ok": true, "message": "LED automation enabled.", "auto_mode": true.
+
+3.8.5 POST /api/led/auto — invalid body
+
+    curl -s -X POST http://<PI_IP>:5000/api/led/auto \
+         -H "Content-Type: application/json" \
+         -d '{"active": "yes"}' | python3 -m json.tool
+
+Expected: HTTP 400, "error": "Missing boolean 'active' in JSON body."
+
+Include: Screenshots of all five curl responses.
+
+
+3.9 Dashboard Verification
+---------------------------
+Purpose: Verify the web UI reflects live system state correctly.
+
+Include numbered screenshots:
+
+  1.  Dashboard loading at http://localhost:8080 — show the full UI
+  2.  Temperature gauge — arc position and colour at a reading below 29°C (green)
+  3.  Temperature gauge — arc position and colour at a reading above 29°C (orange/red)
+  4.  LED status dot — grey (OFF state)
+  5.  LED status dot — green (ON state)
+  6.  Clicking "Turn ON" — show network tab POST request to /api/led/on and UI update
+  7.  Clicking "Turn OFF" — same
+  8.  Auto Mode toggle — before and after
+  9.  History chart — 20 readings plotted with the 29°C threshold line visible
+  10. Pi disconnected — error state / 503 message displayed on dashboard
+
+
+3.10 Bash Script (led_controller.sh)
+--------------------------------------
+Purpose: Verify the automation script executes all five stages, shows dmesg at each
+step, and cleans up on exit.
+
+    ./led_controller.sh
+
+Include screenshots at each stage banner:
+
+  STEP 1 — make output with led_driver.ko produced
+  STEP 2 — insmod success, lsmod confirm, dmesg tail showing init messages
+  STEP 3 — gcc -Wall output, no warnings
+  STEP 4 — demo write/read (ON then OFF), dmesg tail after each, kernel reply printed
+  STEP 5 — led_control running, polling rows in terminal
+
+Cleanup trap test — press Ctrl-C during Step 5. Capture:
+
+    ================================================
+      Shutting down — cleaning up resources...
+    ================================================
+    [cleanup] Removing kernel module (sudo rmmod led_driver)...
+    [cleanup] led_driver removed from kernel.
+
+    [cleanup] Final kernel log (dmesg) — verify clean unload:
+
+Include: Screenshot of the full cleanup output including the final dmesg | tail -10.
+
+
+3.11 End-to-End Integration Test
+----------------------------------
+Purpose: Document a single control cycle that crosses all layers from sensor to hardware.
+
+Include a numbered sequence with one screenshot per step:
+
+  1. cat /tmp/sense_temp
+     Sense HAT reading written by led.py daemon (Python layer -> IPC file)
+
+  2. sudo ./led_control output row
+     C program read that file, generated command, called write(fd, "ON", 2)
+     (user-space system call -> kernel)
+
+  3. dmesg | tail -3
+     "gpioled: command 'ON' received — GPIO 24 HIGH"
+     (kernel dev_write() -> BCM2711 register)
+
+  4. Photo of LED physically lit on breadboard
+     (GPIO register -> hardware)
+
+  5. cat /dev/gpioled returning LED:ON
+     kernel dev_read() via copy_to_user() (hardware state -> user-space)
+
+  6. curl http://<PI_IP>:5000/api/status
+     Flask reads /dev/gpioled, returns JSON (Python API layer)
+
+  7. Browser screenshot of dashboard showing LED dot green and temperature above 29°C
+     (network -> UI)
+
+
+3.12 Annotated dmesg Full Session Log
+--------------------------------------
+Purpose: Provide a complete kernel log from a single test session as an appendix/figure.
+
+Capture procedure:
+
+    sudo dmesg -C
+    ./led_controller.sh
+    # (let it run through Steps 1-4, then Ctrl-C)
+    dmesg > dmesg_session.txt
+    cat dmesg_session.txt
+
+Include: The complete dmesg_session.txt as a figure. Annotate every gpioled: line with:
+  - Timestamp format: [ 1234.567890]
+  - Severity prefix: <6> = KERN_INFO, <4> = KERN_WARNING, <3> = KERN_ERR
+  - A one-line explanation of the kernel action that triggered it
+
+Group annotations into three blocks:
+
+  Block A — Module init
+    insmod -> Steps 1-5 complete (alloc_chrdev_region, cdev_add, class_create,
+    device_create, ioremap, GPFSEL2 configured, module ready)
+
+  Block B — Device operations
+    write ON -> read -> write OFF -> read
+    (dev_open, dev_write, gpio24_set, dev_read, copy_to_user, dev_release per operation)
+
+  Block C — Module exit
+    rmmod -> GPIO 24 LOW -> iounmap -> device_destroy -> class_destroy -> unloaded cleanly
